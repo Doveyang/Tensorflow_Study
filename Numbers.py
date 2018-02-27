@@ -29,13 +29,14 @@ def generate_Matrix(dir):
     File_List = listdir(dir)
     m = len(File_List)
     x_data = np.zeros((m, 1024))
-    y_data = np.zeros((m, 1))
+    y_data = np.zeros((m, 10))
     for i in range(m):
         fileNameStr = File_List[i]
         fileStr = fileNameStr.split('.')[0]
         classNumStr = int(fileStr.split('_')[0])
-        y_data[i][0] = classNumStr
+        y_data[i, classNumStr:classNumStr + 1] = 1.0
         x_data[i, :] = img2vector(dir + fileNameStr)
+        x_data = x_data.astype(np.float32)
     return x_data, y_data
 
 
@@ -50,20 +51,23 @@ def compute_accuracy(v_xs, v_ys):
 
 x_data, y_data = generate_Matrix('digits/trainingDigits/')
 xs = tf.placeholder(tf.float32, [None, 1024])
-ys = tf.placeholder(tf.float32, [None, 1])
+ys = tf.placeholder(tf.float32, [None, 10])
 
-prediction = add_layer(xs, 1024, 1, activation_function=tf.nn.softmax)
+l1 = add_layer(x_data, 1024, 150, activation_function=tf.nn.tanh)
+prediction = add_layer(l1, 150, 10, activation_function=tf.nn.softmax)
 
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction), reduction_indices=[1]))
-train_step = tf.train.GradientDescentOptimizer(.5).minimize(cross_entropy)
+cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction), reduction_indices=1))
+train_step = tf.train.GradientDescentOptimizer(.8).minimize(cross_entropy)
+
 
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 
 for i in range(100):
-    sess.run(train_step, feed_dict={xs: x_data, ys: y_data})  # 未做batch
+    sess.run(train_step, feed_dict={xs: x_data, ys: y_data})
+
 
 v_xs, v_ys = generate_Matrix('digits/testDigits/')
 y_pre = sess.run(prediction, feed_dict={xs: v_xs})
-print y_pre  # 输出全为1，而compute_accuracy却显示100%，非常奇怪。。。
-print compute_accuracy(v_xs, v_ys)
+print np.shape(v_xs), np.shape(v_ys), np.shape(y_pre)
+# 输出(946, 1024) (946, 10) (1934, 10)，这里不知道为什么y的预测值还是有1934个？1934是训练集的个数，测试机个数只有946个。
